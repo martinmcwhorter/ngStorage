@@ -1,4 +1,4 @@
-'use strict';
+//'use strict';
 
 (function() {
 
@@ -16,7 +16,7 @@
      * @requires $window
      */
 
-    factory('$localStorage', _storageFactory('localStorage')).
+    provider('$localStorage', function () { return new StorageProvider('localStorage') }).
 
     /**
      * @ngdoc object
@@ -25,9 +25,22 @@
      * @requires $window
      */
 
-    factory('$sessionStorage', _storageFactory('sessionStorage'));
+    provider('$sessionStorage', function () { return new StorageProvider('sessionStorage') });
+    
+    function StorageProvider(storageType) {
+    
+        var prefix = 'ngStorage-';
 
-    function _storageFactory(storageType) {
+        this.setPrefix = function (value) {
+            console.log("prefix set to ", value);
+            prefix = value;
+        }
+
+        this.$get = function () { return _storageFactory(storageType, prefix) };
+    }    
+    
+    function _storageFactory(storageType, prefix) {
+        console.log("prefix in factory is", prefix, storageType)
         return [
             '$rootScope',
             '$window',
@@ -61,7 +74,7 @@
 
                 for (var i = 0, k; i < webStorage.length; i++) {
                     // #8, #10: `webStorage.key(i)` may be an empty string (or throw an exception in IE9 if `webStorage` is empty)
-                    (k = webStorage.key(i)) && 'ngStorage-' === k.slice(0, 10) && ($storage[k.slice(10)] = angular.fromJson(webStorage.getItem(k)));
+                    (k = webStorage.key(i)) && prefix === k.slice(0, 10) && ($storage[k.slice(10)] = angular.fromJson(webStorage.getItem(k)));
                 }
 
                 _last$storage = angular.copy($storage);
@@ -72,13 +85,13 @@
 
                         if (!angular.equals($storage, _last$storage)) {
                             angular.forEach($storage, function(v, k) {
-                                angular.isDefined(v) && '$' !== k[0] && webStorage.setItem('ngStorage-' + k, angular.toJson(v));
+                                angular.isDefined(v) && '$' !== k[0] && webStorage.setItem(prefix + k, angular.toJson(v));
 
                                 delete _last$storage[k];
                             });
 
                             for (var k in _last$storage) {
-                                webStorage.removeItem('ngStorage-' + k);
+                                webStorage.removeItem(prefix + k);
                             }
 
                             _last$storage = angular.copy($storage);
@@ -88,7 +101,7 @@
 
                 // #6: Use `$window.addEventListener` instead of `angular.element` to avoid the jQuery-specific `event.originalEvent`
                 'localStorage' === storageType && $window.addEventListener && $window.addEventListener('storage', function(event) {
-                    if ('ngStorage-' === event.key.slice(0, 10)) {
+                    if (prefix === event.key.slice(0, 10)) {
                         event.newValue ? $storage[event.key.slice(10)] = angular.fromJson(event.newValue) : delete $storage[event.key.slice(10)];
 
                         _last$storage = angular.copy($storage);
